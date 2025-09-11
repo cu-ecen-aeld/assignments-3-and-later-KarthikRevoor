@@ -26,11 +26,6 @@ else
 fi
 
 
-make clean
-make
-
-
-
 MATCHSTR="The number of files are ${NUMFILES} and the number of matching lines are ${NUMFILES}"
 
 echo "Writing ${NUMFILES} files containing string ${WRITESTR} to ${WRITEDIR}"
