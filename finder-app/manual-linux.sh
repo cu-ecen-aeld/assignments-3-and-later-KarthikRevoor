@@ -38,7 +38,7 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     git checkout ${KERNEL_VERSION}
 
     # TODO: Add your kernel build steps here
-    make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} mrproper
+    #make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} mrproper
     make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} defconfig
     make -j$(nproc) ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} all
     make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} modules
@@ -97,16 +97,25 @@ sudo mknod -m 666 dev/null c 1 3
 sudo mknod -m 666 dev/console c 5 1 
 
 # TODO: Clean and build the writer utility
-cd ${FINDER_APP_DIR}
+cd "${FINDER_APP_DIR}"
 make clean 
 make CROSS_COMPILE=${CROSS_COMPILE}
 
 # TODO: Copy the finder related scripts and executables to the /home directory
 # on the target rootfs
 mkdir -p "${OUTDIR}/rootfs/home/conf"
-cp finder.sh writer finder-test.sh autorun-qemu.sh "${OUTDIR}/rootfs/home/"
-cp conf/username.txt conf/assignment.txt "${OUTDIR}/rootfs/home/conf"
+cp ${FINDER_APP_DIR}/finder.sh \
+   ${FINDER_APP_DIR}/writer \
+   ${FINDER_APP_DIR}/finder-test.sh \
+   ${FINDER_APP_DIR}/autorun-qemu.sh \
+   "${OUTDIR}/rootfs/home/"
 
+cp ${FINDER_APP_DIR}/conf/username.txt \
+   ${FINDER_APP_DIR}/conf/assignment.txt \
+   "${OUTDIR}/rootfs/home/conf/"
+
+
+chmod +x "${OUTDIR}/rootfs/home/"*.sh
 # TODO: Chown the root directory
 sudo chown -R root:root ${OUTDIR}/rootfs
 
@@ -114,3 +123,4 @@ sudo chown -R root:root ${OUTDIR}/rootfs
 
 cd "${OUTDIR}/rootfs"
 find . | cpio -H newc -ov --owner=root:root | gzip > "${OUTDIR}/initramfs.cpio.gz"
+cp /tmp/aeld/linux-stable/arch/arm64/boot/Image ${OUTDIR}/
