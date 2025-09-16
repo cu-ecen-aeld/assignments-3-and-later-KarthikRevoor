@@ -123,4 +123,3 @@ sudo chown -R root:root ${OUTDIR}/rootfs
 
 cd "${OUTDIR}/rootfs"
 find . | cpio -H newc -ov --owner=root:root | gzip > "${OUTDIR}/initramfs.cpio.gz"
-cp /tmp/aeld/linux-stable/arch/arm64/boot/Image ${OUTDIR}/
