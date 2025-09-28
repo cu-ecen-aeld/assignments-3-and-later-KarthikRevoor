@@ -1,21 +1,22 @@
-CROSS_COMPILE = aarch64-linux-gnu-
+CROSS_COMPILE ?= aarch64-linux-gnu-
+CC      := $(CROSS_COMPILE)gcc
+CFLAGS  := -Wall -Werror -g -pthread
+LDLIBS  :=
 
-CC = $(CROSS_COMPILE)gcc
-CFLAGS = -Wall -Werror -g -pthread
-LDFLAGS =
-TARGET := aesdsocket
-SRC := aesdsocket.c
-OBJ := $(SRC:.c=.o)
+PROGRAM := aesdsocket
+SOURCES := aesdsocket.c
+OBJECTS := $(SOURCES:.c=.o)
 
-.PHONY: all
-all: $(TARGET)
+all: $(PROGRAM)
 
-$(TARGET): $(OBJ)
-	$(CC) $(CFLAGS)$(LDFLAGS) -o $@ $^
+$(PROGRAM): $(OBJECTS)
+	$(CC) $(OBJECTS) $(CFLAGS) $(LDLIBS) -o $@
 
-%.o: %.c
+$(OBJECTS): %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 .PHONY: clean
 clean:
-	rm -f $(TARGET) $(OBJ)
+	@echo "Cleaning build files..."
+	@rm -f $(PROGRAM) $(OBJECTS)
+
