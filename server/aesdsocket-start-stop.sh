@@ -2,7 +2,7 @@
 
 COMMAND=$1
 DAEMON_NAME="aesdsocket"
-DAEMON_PATH="/home/krevoor/AESD/assignments-3-and-later-KarthikRevoor/server/aesdsocket"
+DAEMON_PATH="/usr/bin/aesdsocket"
 
 if [ -z "$COMMAND" ]; then
     echo "Usage: $0 start|stop"
