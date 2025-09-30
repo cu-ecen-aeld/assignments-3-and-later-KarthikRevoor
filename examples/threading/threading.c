@@ -14,7 +14,8 @@ void* threadfunc(void* thread_param)
     // TODO: wait, obtain mutex, wait, release mutex as described by thread_data structure
     // hint: use a cast like the one below to obtain thread arguments from your parameter
     //struct thread_data* thread_func_args = (struct thread_data *) thread_param;
-        if (thread_param == NULL) {
+        if (thread_param == NULL) 
+        {
         return NULL;
     }
 
