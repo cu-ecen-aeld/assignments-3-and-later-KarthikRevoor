@@ -1,7 +1,8 @@
-CROSS_COMPILE ?= aarch64-linux-gnu-
+# Default: build native on host
+CROSS_COMPILE ?=
 CC      := $(CROSS_COMPILE)gcc
 CFLAGS  := -Wall -Werror -g -pthread
-LDLIBS  :=
+
 
 PROGRAM := aesdsocket
 SOURCES := aesdsocket.c
@@ -10,7 +11,7 @@ OBJECTS := $(SOURCES:.c=.o)
 all: $(PROGRAM)
 
 $(PROGRAM): $(OBJECTS)
-	$(CC) $(OBJECTS) $(CFLAGS) $(LDLIBS) -o $@
+	$(CC) $(CFLAGS) $(OBJECTS) $(LDLIBS) -o $@
 
 $(OBJECTS): %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
