@@ -11,7 +11,7 @@ OBJECTS := $(SOURCES:.c=.o)
 all: $(PROGRAM)
 
 $(PROGRAM): $(OBJECTS)
-	$(CC) $(CFLAGS) $(OBJECTS) $(LDLIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJECTS) $(LDLIBS) -o $@
 
 $(OBJECTS): %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
