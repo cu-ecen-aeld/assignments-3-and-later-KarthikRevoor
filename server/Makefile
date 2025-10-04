@@ -1,10 +1,10 @@
 # Default: build native on host
 CROSS_COMPILE ?=
-CC      := $(CROSS_COMPILE)gcc
-CFLAGS  := -Wall -Werror -g -pthread
+CC      ?= $(CROSS_COMPILE)gcc
+CFLAGS  ?= -Wall -Werror -g -pthread
+LDFLAGS ?=
 
-
-PROGRAM := aesdsocket
+PROGRAM ?= aesdsocket
 SOURCES := aesdsocket.c
 OBJECTS := $(SOURCES:.c=.o)
 
