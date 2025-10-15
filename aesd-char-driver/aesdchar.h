@@ -29,9 +29,8 @@
 struct aesd_dev
 {
     struct aesd_circular_buffer buffer;   /* Circular buffer for storing write commands */
+    struct aesd_buffer_entry working_entry; /* Temporary entry for accumulating partial writes */
     struct mutex lock;                    /* Mutex for synchronizing access */
-    char *write_data;                     /* Temporary buffer for accumulating write data */
-    size_t write_size;                    /* Current size of temporary write data */
     struct cdev cdev;                     /* Char device structure */
 };
 
