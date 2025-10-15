@@ -1,7 +1,7 @@
 # Default: build native on host
 CROSS_COMPILE ?=
 CC      ?= $(CROSS_COMPILE)gcc
-CFLAGS  ?= -Wall -Werror -g -pthread
+CFLAGS  ?= -Wall -Werror -g -pthread -DUSE_AESD_CHAR_DEVICE=1
 LDFLAGS ?=
 
 PROGRAM ?= aesdsocket

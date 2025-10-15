@@ -16,8 +16,16 @@
 #include <sys/stat.h>
 #include <fcntl.h>     
 
+#ifndef USE_AESD_CHAR_DEVICE
+#define USE_AESD_CHAR_DEVICE 1
+#endif
+
 #define PORT        9000
+#if USE_AESD_CHAR_DEVICE
+#define DATAFILE    "/dev/aesdchar"
+#else
 #define DATAFILE    "/var/tmp/aesdsocketdata"
+#endif
 #define BACKLOG     10
 #define BUFSIZE     1024
 #define TS_INTERVAL 10
@@ -25,9 +33,10 @@
 static volatile sig_atomic_t exit_requested = 0;
 static int sockfd_global = -1;
 static pthread_mutex_t file_mutex = PTHREAD_MUTEX_INITIALIZER;
+#if !USE_AESD_CHAR_DEVICE
 static pthread_t timestamp_thread;
+#endif
 
-/* ---- Thread structure ---- */
 struct client_thread {
     pthread_t tid;
     int clientfd;
@@ -37,19 +46,17 @@ struct client_thread {
 
 SLIST_HEAD(thread_list, client_thread) thread_head = SLIST_HEAD_INITIALIZER(thread_head);
 
-/* ---- Signal handler ---- */
 void handle_signal(int signo)
 {
     if (signo == SIGINT || signo == SIGTERM) {
         syslog(LOG_INFO, "Caught signal, exiting");
         exit_requested = 1;
         if (sockfd_global != -1) {
-            shutdown(sockfd_global, SHUT_RDWR);   // unblock accept()
+            shutdown(sockfd_global, SHUT_RDWR);
         }
     }
 }
 
-/* ---- Create server socket ---- */
 int create_server_socket()
 {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -82,7 +89,6 @@ int create_server_socket()
     return sockfd;
 }
 
-/* ---- Client thread ---- */
 void *client_handler(void *arg)
 {
     struct client_thread *info = (struct client_thread *)arg;
@@ -98,25 +104,24 @@ void *client_handler(void *arg)
         if (bytes <= 0) break;
 
         pthread_mutex_lock(&file_mutex);
-        FILE *fp = fopen(DATAFILE, "a+");
-        if (!fp) {
-            syslog(LOG_ERR, "fopen failed: %s", strerror(errno));
+        int fd = open(DATAFILE, O_RDWR | O_APPEND);
+        if (fd < 0) {
+            syslog(LOG_ERR, "open failed: %s", strerror(errno));
             pthread_mutex_unlock(&file_mutex);
             break;
         }
 
-        fwrite(buf, 1, bytes, fp);
-        fflush(fp);
-        fsync(fileno(fp));   //
+        write(fd, buf, bytes);
 
         if (memchr(buf, '\n', bytes)) {
-            rewind(fp);
-            size_t n;
-            while ((n = fread(buf, 1, sizeof(buf), fp)) > 0) {
+            lseek(fd, 0, SEEK_SET);
+            ssize_t n;
+            while ((n = read(fd, buf, sizeof(buf))) > 0) {
                 send(clientfd, buf, n, 0);
             }
         }
-        fclose(fp);
+
+        close(fd);
         pthread_mutex_unlock(&file_mutex);
     }
 
@@ -134,7 +139,7 @@ void *client_handler(void *arg)
     return NULL;
 }
 
-/* ---- Timestamp thread ---- */
+#if !USE_AESD_CHAR_DEVICE
 void *timestamp_func(void *arg)
 {
     while (!exit_requested) {
@@ -153,15 +158,15 @@ void *timestamp_func(void *arg)
         if (fp) {
             fputs(ts, fp);
             fflush(fp);
-            fsync(fileno(fp));   
+            fsync(fileno(fp));
             fclose(fp);
         }
         pthread_mutex_unlock(&file_mutex);
     }
     return NULL;
 }
+#endif
 
-/* ---- Graceful shutdown ---- */
 void shutdown_all()
 {
     if (sockfd_global != -1) {
@@ -177,7 +182,6 @@ void shutdown_all()
     }
 }
 
-/* ---- Main ---- */
 int main(int argc, char *argv[])
 {
     int daemon_mode = (argc == 2 && strcmp(argv[1], "-d") == 0);
@@ -186,8 +190,10 @@ int main(int argc, char *argv[])
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal);
 
+#if !USE_AESD_CHAR_DEVICE
     FILE *fp = fopen(DATAFILE, "w");
     if (fp) fclose(fp);
+#endif
 
     sockfd_global = create_server_socket();
     if (sockfd_global < 0) return EXIT_FAILURE;
@@ -202,10 +208,12 @@ int main(int argc, char *argv[])
         close(STDERR_FILENO);
     }
 
+#if !USE_AESD_CHAR_DEVICE
     if (pthread_create(&timestamp_thread, NULL, timestamp_func, NULL) != 0) {
         syslog(LOG_ERR, "Failed to create timestamp thread");
         exit(EXIT_FAILURE);
     }
+#endif
 
     while (!exit_requested) {
         struct sockaddr_in client_addr;
@@ -235,9 +243,12 @@ int main(int argc, char *argv[])
     }
 
     shutdown_all();
-    pthread_join(timestamp_thread, NULL);
 
+#if !USE_AESD_CHAR_DEVICE
+    pthread_join(timestamp_thread, NULL);
     remove(DATAFILE);
+#endif
+
     closelog();
     return 0;
 }
