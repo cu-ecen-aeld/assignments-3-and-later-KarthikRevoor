@@ -1,3 +1,12 @@
+/**
+ * @file aesdsocket.c
+ * @brief Multi-threaded socket server for AESD assignment 8
+ *
+ * Supports both character device mode (/dev/aesdchar)
+ * and file mode (/var/tmp/aesdsocketdata) depending on
+ * USE_AESD_CHAR_DEVICE define.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,12 +18,12 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
-#include <time.h>
 #include <stdbool.h>
 #include <sys/queue.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>     
+#include <fcntl.h>
+#include <time.h>
 
 #ifndef USE_AESD_CHAR_DEVICE
 #define USE_AESD_CHAR_DEVICE 1
@@ -26,6 +35,7 @@
 #else
 #define DATAFILE    "/var/tmp/aesdsocketdata"
 #endif
+
 #define BACKLOG     10
 #define BUFSIZE     1024
 #define TS_INTERVAL 10
@@ -33,6 +43,7 @@
 static volatile sig_atomic_t exit_requested = 0;
 static int sockfd_global = -1;
 static pthread_mutex_t file_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 #if !USE_AESD_CHAR_DEVICE
 static pthread_t timestamp_thread;
 #endif
@@ -46,18 +57,19 @@ struct client_thread {
 
 SLIST_HEAD(thread_list, client_thread) thread_head = SLIST_HEAD_INITIALIZER(thread_head);
 
+/* ---------- Signal Handling ---------- */
 void handle_signal(int signo)
 {
     if (signo == SIGINT || signo == SIGTERM) {
         syslog(LOG_INFO, "Caught signal, exiting");
         exit_requested = 1;
-        if (sockfd_global != -1) {
+        if (sockfd_global != -1)
             shutdown(sockfd_global, SHUT_RDWR);
-        }
     }
 }
 
-int create_server_socket()
+/* ---------- Server Socket Setup ---------- */
+int create_server_socket(void)
 {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
@@ -68,8 +80,7 @@ int create_server_socket()
     int opt = 1;
     setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-    struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
+    struct sockaddr_in server_addr = {0};
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     server_addr.sin_port = htons(PORT);
@@ -89,6 +100,7 @@ int create_server_socket()
     return sockfd;
 }
 
+/* ---------- Client Handler ---------- */
 void *client_handler(void *arg)
 {
     struct client_thread *info = (struct client_thread *)arg;
@@ -96,8 +108,7 @@ void *client_handler(void *arg)
     char buf[BUFSIZE];
     ssize_t bytes;
 
-    syslog(LOG_INFO, "Accepted connection from %s",
-           inet_ntoa(info->client_addr.sin_addr));
+    syslog(LOG_INFO, "Accepted connection from %s", inet_ntoa(info->client_addr.sin_addr));
 
     while (!exit_requested) {
         bytes = recv(clientfd, buf, sizeof(buf), 0);
@@ -116,9 +127,8 @@ void *client_handler(void *arg)
         if (memchr(buf, '\n', bytes)) {
             lseek(fd, 0, SEEK_SET);
             ssize_t n;
-            while ((n = read(fd, buf, sizeof(buf))) > 0) {
+            while ((n = read(fd, buf, sizeof(buf))) > 0)
                 send(clientfd, buf, n, 0);
-            }
         }
 
         close(fd);
@@ -127,19 +137,18 @@ void *client_handler(void *arg)
 
     shutdown(clientfd, SHUT_RDWR);
     close(clientfd);
-
-    syslog(LOG_INFO, "Closed connection from %s",
-           inet_ntoa(info->client_addr.sin_addr));
+    syslog(LOG_INFO, "Closed connection from %s", inet_ntoa(info->client_addr.sin_addr));
 
     pthread_mutex_lock(&file_mutex);
     SLIST_REMOVE(&thread_head, info, client_thread, entries);
     pthread_mutex_unlock(&file_mutex);
-
     free(info);
+
     return NULL;
 }
 
 #if !USE_AESD_CHAR_DEVICE
+/* ---------- Timestamp Thread (only for file mode) ---------- */
 void *timestamp_func(void *arg)
 {
     while (!exit_requested) {
@@ -167,7 +176,8 @@ void *timestamp_func(void *arg)
 }
 #endif
 
-void shutdown_all()
+/* ---------- Shutdown Helper ---------- */
+void shutdown_all(void)
 {
     if (sockfd_global != -1) {
         close(sockfd_global);
@@ -182,6 +192,7 @@ void shutdown_all()
     }
 }
 
+/* ---------- Main ---------- */
 int main(int argc, char *argv[])
 {
     int daemon_mode = (argc == 2 && strcmp(argv[1], "-d") == 0);
