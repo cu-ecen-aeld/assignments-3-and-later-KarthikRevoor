@@ -73,14 +73,14 @@ void daemonize(void)
 {
     pid_t pid = fork();
     if (pid < 0) exit(EXIT_FAILURE);
-    if (pid > 0) exit(EXIT_SUCCESS); // parent
+    if (pid > 0) exit(EXIT_SUCCESS);
 
     if (setsid() < 0) exit(EXIT_FAILURE);
     signal(SIGHUP, SIG_IGN);
 
     pid = fork();
     if (pid < 0) exit(EXIT_FAILURE);
-    if (pid > 0) exit(EXIT_SUCCESS); // parent
+    if (pid > 0) exit(EXIT_SUCCESS);
 
     umask(0);
     chdir("/");
@@ -182,15 +182,21 @@ void* client_thread_func(void* thread_param)
         }
 
         write(fd, buffer, bytes_received);
+        fsync(fd);
 
         if (memchr(buffer, '\n', bytes_received)) {
-            lseek(fd, 0, SEEK_SET);
-            ssize_t n;
-            while ((n = read(fd, buffer, BUFFER_SIZE)) > 0)
-                send(tinfo->client_fd, buffer, n, 0);
+            close(fd);
+            fd = open(FILE_PATH, O_RDONLY);
+            if (fd >= 0) {
+                ssize_t n;
+                while ((n = read(fd, buffer, BUFFER_SIZE)) > 0)
+                    send(tinfo->client_fd, buffer, n, 0);
+                close(fd);
+            }
+        } else {
+            close(fd);
         }
 
-        close(fd);
         pthread_mutex_unlock(&g_mutex);
     }
 
@@ -242,7 +248,9 @@ void graceful_shutdown(void)
     client_thread_t *tnode;
     while (!SLIST_EMPTY(&g_thread_list_head)) {
         tnode = SLIST_FIRST(&g_thread_list_head);
+        SLIST_REMOVE_HEAD(&g_thread_list_head, entries);
         pthread_join(tnode->thread_id, NULL);
+        free(tnode);
     }
 }
 

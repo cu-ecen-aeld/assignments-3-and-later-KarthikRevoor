@@ -1,22 +1,26 @@
-# Default: build native on host
 CROSS_COMPILE ?=
-CC      ?= $(CROSS_COMPILE)gcc
-CFLAGS  ?= -Wall -Werror -g -pthread -DUSE_AESD_CHAR_DEVICE=1
-LDFLAGS ?=
+CC      := $(CROSS_COMPILE)gcc
+CFLAGS  := -Wall -Werror -pthread -D_GNU_SOURCE
+LDFLAGS := -pthread
 
-PROGRAM ?= aesdsocket
+# Build switch: 1 = use /dev/aesdchar, 0 = use /var/tmp/aesdsocketdata
+USE_AESD_CHAR_DEVICE ?= 1
+CFLAGS += -DUSE_AESD_CHAR_DEVICE=$(USE_AESD_CHAR_DEVICE)
+
+PROGRAM := aesdsocket
 SOURCES := aesdsocket.c
 OBJECTS := $(SOURCES:.c=.o)
+
+.PHONY: all clean
 
 all: $(PROGRAM)
 
 $(PROGRAM): $(OBJECTS)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJECTS) $(LDLIBS) -o $@
+	$(CC) $(CFLAGS) $(OBJECTS) $(LDFLAGS) -o $(PROGRAM)
 
-$(OBJECTS): %.o: %.c
+%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-.PHONY: clean
 clean:
 	@echo "Cleaning build files..."
 	@rm -f $(PROGRAM) $(OBJECTS)
