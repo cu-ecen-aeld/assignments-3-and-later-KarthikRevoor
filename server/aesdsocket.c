@@ -33,6 +33,7 @@
 #include <stdbool.h>
 #include <errno.h>
 #include <sys/queue.h>
+#include "aesd_ioctl.h"
 
 #define PORT             "9000"
 #define BUFFER_SIZE      1024
@@ -180,6 +181,48 @@ void* client_thread_func(void* thread_param)
             pthread_mutex_unlock(&g_mutex);
             break;
         }
+                /* Check for AESDCHAR_IOCSEEKTO:X,Y command */
+        if (strncmp(buffer, "AESDCHAR_IOCSEEKTO:", 19) == 0)
+        {
+            struct aesd_seekto seekto;
+            unsigned int write_cmd = 0, write_cmd_offset = 0;
+
+            if (sscanf(buffer + 19, "%u,%u", &write_cmd, &write_cmd_offset) == 2)
+            {
+                seekto.write_cmd = write_cmd;
+                seekto.write_cmd_offset = write_cmd_offset;
+
+                if (ioctl(fd, AESDCHAR_IOCSEEKTO, &seekto) == -1)
+                {
+                    syslog(LOG_ERR, "ioctl AESDCHAR_IOCSEEKTO failed: %s", strerror(errno));
+                }
+                else
+                {
+                    /* Read from same FD to preserve new seek offset */
+                    char read_buf[BUFFER_SIZE];
+                    ssize_t read_size;
+                    lseek(fd, 0, SEEK_CUR); // ensure correct position
+
+                    while ((read_size = read(fd, read_buf, sizeof(read_buf))) > 0)
+                    {
+                        if (send(tinfo->client_fd, read_buf, read_size, 0) == -1)
+                        {
+                            syslog(LOG_ERR, "Send failed: %s", strerror(errno));
+                            break;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                syslog(LOG_ERR, "Malformed AESDCHAR_IOCSEEKTO command");
+            }
+
+            close(fd);
+            pthread_mutex_unlock(&g_mutex);
+            continue; /* Skip normal write path */
+        }
+
 
         write(fd, buffer, bytes_received);
         fsync(fd);

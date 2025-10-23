@@ -1,6 +1,6 @@
 CROSS_COMPILE ?=
 CC      := $(CROSS_COMPILE)gcc
-CFLAGS  := -Wall -Werror -pthread -D_GNU_SOURCE
+CFLAGS  := -Wall -Werror -pthread -D_GNU_SOURCE -I../aesd-char-driver
 LDFLAGS := -pthread
 
 # Build switch: 1 = use /dev/aesdchar, 0 = use /var/tmp/aesdsocketdata
