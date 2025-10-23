@@ -1,9 +1,10 @@
+TOPDIR ?= $(CURDIR)
+
 CROSS_COMPILE ?=
 CC      := $(CROSS_COMPILE)gcc
-CFLAGS  := -Wall -Werror -pthread -D_GNU_SOURCE -I../aesd-char-driver
+CFLAGS  := -Wall -Werror -pthread -D_GNU_SOURCE -I$(TOPDIR)/../aesd-char-driver -I../aesd-char-driver
 LDFLAGS := -pthread
 
-# Build switch: 1 = use /dev/aesdchar, 0 = use /var/tmp/aesdsocketdata
 USE_AESD_CHAR_DEVICE ?= 1
 CFLAGS += -DUSE_AESD_CHAR_DEVICE=$(USE_AESD_CHAR_DEVICE)
 
