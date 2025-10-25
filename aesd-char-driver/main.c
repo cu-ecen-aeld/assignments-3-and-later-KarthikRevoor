@@ -94,92 +94,73 @@ out:
 ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
                    loff_t *f_pos)
 {
-    ssize_t retval = -ENOMEM;
     struct aesd_dev *dev = filp->private_data;
+    ssize_t retval = count;
     const char *newline_ptr;
-    char *new_buff;
-    char *old_buff;
-    struct aesd_buffer_entry entry;
+    char *new_buff = NULL;
     size_t write_size, new_size;
-
-    PDEBUG("write %zu bytes with offset %lld", count, *f_pos);
-
-    if (mutex_lock_interruptible(&dev->lock))
-        return -ERESTARTSYS;
+    struct aesd_buffer_entry entry = {0};
 
     new_buff = kmalloc(count, GFP_KERNEL);
-    if (!new_buff) {
-        retval = -ENOMEM;
-        goto out;
-    }
+    if (!new_buff)
+        return -ENOMEM;
 
     if (copy_from_user(new_buff, buf, count)) {
         kfree(new_buff);
-        retval = -EFAULT;
-        goto out;
+        return -EFAULT;
     }
 
     newline_ptr = memchr(new_buff, '\n', count);
 
-    if (!newline_ptr) {
-        old_buff = (char *)dev->working_entry.buffptr;
-        new_size = dev->working_entry.size + count;
-
-        dev->working_entry.buffptr = krealloc(old_buff, new_size, GFP_KERNEL);
-        if (!dev->working_entry.buffptr) {
-            kfree(new_buff);
-            retval = -ENOMEM;
-            goto out;
-        }
-
-        memcpy((void *)(dev->working_entry.buffptr + dev->working_entry.size),
-               new_buff, count);
-
-        dev->working_entry.size = new_size;
-        retval = count;
+    if (mutex_lock_interruptible(&dev->lock)) {
         kfree(new_buff);
-        goto out;
+        return -ERESTARTSYS;
     }
 
-    /* If newline found — complete command entry */
+    if (!newline_ptr) {
+        new_size = dev->working_entry.size + count;
+        dev->working_entry.buffptr = krealloc(dev->working_entry.buffptr, new_size, GFP_KERNEL);
+        if (!dev->working_entry.buffptr) {
+            retval = -ENOMEM;
+            goto out_unlock;
+        }
+
+        memcpy(dev->working_entry.buffptr + dev->working_entry.size, new_buff, count);
+        dev->working_entry.size = new_size;
+        goto out_unlock;
+    }
+
     write_size = (newline_ptr - new_buff) + 1;
     new_size = dev->working_entry.size + write_size;
 
-    dev->working_entry.buffptr =
-        krealloc((void *)dev->working_entry.buffptr, new_size, GFP_KERNEL);
+    dev->working_entry.buffptr = krealloc(dev->working_entry.buffptr, new_size, GFP_KERNEL);
     if (!dev->working_entry.buffptr) {
-        kfree(new_buff);
         retval = -ENOMEM;
-        goto out;
+        goto out_unlock;
     }
 
-    memcpy((void *)(dev->working_entry.buffptr + dev->working_entry.size),
-           new_buff, write_size);
+    memcpy(dev->working_entry.buffptr + dev->working_entry.size, new_buff, write_size);
     dev->working_entry.size = new_size;
 
     entry.buffptr = dev->working_entry.buffptr;
     entry.size = dev->working_entry.size;
-
     dev->working_entry.buffptr = NULL;
     dev->working_entry.size = 0;
 
-    /* Before adding, free the oldest entry if the buffer is full */
     if (dev->buffer.full) {
-        struct aesd_buffer_entry *oldest =
-            &dev->buffer.entry[dev->buffer.out_offs];
+        struct aesd_buffer_entry *oldest = &dev->buffer.entry[dev->buffer.out_offs];
         if (oldest->buffptr)
             kfree(oldest->buffptr);
     }
 
     aesd_circular_buffer_add_entry(&dev->buffer, &entry);
 
-    retval = count;
-    kfree(new_buff);
-
-out:
+out_unlock:
     mutex_unlock(&dev->lock);
+    kfree(new_buff);
     return retval;
 }
+
 
 loff_t aesd_llseek(struct file *filp, loff_t off, int whence)
 {
