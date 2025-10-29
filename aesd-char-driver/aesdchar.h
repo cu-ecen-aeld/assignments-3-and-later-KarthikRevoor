@@ -32,13 +32,15 @@ int aesd_open(struct inode *inode, struct file *filp);
 int aesd_release(struct inode *inode, struct file *filp);
 int aesd_init_module(void);
 void aesd_cleanup_module(void);
+loff_t aesd_llseek(struct file *filp, loff_t off, int whence);
+long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
 
 struct aesd_dev
 {
-    struct aesd_circular_buffer buffer;   /* Circular buffer for storing write commands */
-    struct aesd_buffer_entry working_entry; /* Temporary entry for accumulating partial writes */
-    struct mutex lock;                    /* Mutex for synchronizing access */
-    struct cdev cdev;                     /* Char device structure */
+    struct aesd_circular_buffer buffer;   
+    struct aesd_buffer_entry working_entry; 
+    struct mutex lock;                    
+    struct cdev cdev;                     
 };
 
 #endif /* AESD_CHAR_DRIVER_AESDCHAR_H_ */
